@@ -7,6 +7,7 @@
 #include "../EMD/EMD.h"
 #include "../EMD/EMD_light.h"
 #include "../JRM/JRM.h"
+#include "../DIM/DIM.h"
 
 #define FLOW_PIN_PULL_HIGH_DELAY 0
 #define FLOW_PIN_PULL_LOW_DELAY 0
@@ -103,6 +104,17 @@ namespace esphome
                 obj->set_controller(this);
             }
 
+            /**
+             * @brief Register a DIM entity on this controller
+             *
+             * @param obj A DIM entity
+             */
+            void register_DIM(DIM_light::DIM *obj)
+            {
+                dims_[obj->get_key()] = obj;
+                obj->set_controller(this);
+            }
+
         protected:
             /**
              * @brief Processes a valid command received from the bus and makes necessary changes to registered entities.
@@ -180,6 +192,12 @@ namespace esphome
              *
              */
             std::map<uint16_t, JRM_cover::JRM *> jrms_;
+
+            /**
+             * @brief A Map of available DIM entities
+             *
+             */
+            std::map<uint16_t, DIM_cover::DIM *> dims_;
 
             /**
              * @brief Time since the last message has been received.

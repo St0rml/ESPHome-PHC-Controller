@@ -105,6 +105,7 @@ namespace esphome
 
             ESP_LOGCONFIG(TAG, "PHC - NR. of  AMD: %i", amds_.size());
             ESP_LOGCONFIG(TAG, "PHC - NR. of  JRM: %i", jrms_.size());
+            ESP_LOGCONFIG(TAG, "PHC - NR. of  JRM: %i", dims_.size());
             ESP_LOGCONFIG(TAG, "PHC - NR. of  EMD: %i", emds_.size());
             ESP_LOGCONFIG(TAG, "PHC - NR. of  EMD-Lights: %i", emd_lights_.size());
         }
@@ -222,6 +223,39 @@ namespace esphome
                 return;
             }
 
+            // DIM 
+            if (device_class == DIM_MODULE_ADDRESS)
+            {
+                // Initial configuration request message
+                if (message[0] == 0xFF)
+                {
+                    delayMicroseconds(TIMING_DELAY);
+                    send_dim_config(device_id);
+                    return;
+                }
+
+                // Check for Acknowledgement
+                if (message[0] == 0x00)
+                {
+                    bool handled = false;
+                    uint8_t channels = message[1];
+                    for (uint8_t i = 0; i < 8; i++)
+                    {
+                        // Handle output switches
+                        if (dims_.count(util::key(device_id, i)))
+                        {
+                            auto *dim = dims_[util::key(device_id, i)];
+                            // Mask the channel and publish states accordingly
+                            bool state = channels & (0x1 << i);
+                            dim_light->publish_state(state);
+                        }
+                    }
+                    if (!handled)
+                        ESP_LOGI(TAG, "No configuration found for Message from (DIM) Module: [DIP: %i]", device_id);
+                }
+                return;
+            }
+
             // Send default acknowledgement
             send_acknowledgement(*device_class_id, toggle);
         }
@@ -279,6 +313,19 @@ namespace esphome
             message[55] = static_cast<uint8_t>((crc & 0xFF00) >> 8);
 
             write_array(message, 56, false);
+        }
+
+        void PHCController::send_dim_config(uint8_t id)
+        {
+            ESP_LOGI(TAG, "Configuring Module (DIM): [DIP: %i]", id);
+
+            uint8_t message[7] = {static_cast<uint8_t>(AMD_MODULE_ADDRESS | id), 0x04, 0xFE, 0x00, 0xFF, 0x00, 0x00};
+
+            short crc = util::PHC_CRC(message, 5);
+            message[5] = static_cast<uint8_t>(crc & 0xFF);
+            message[6] = static_cast<uint8_t>((crc & 0xFF00) >> 8);
+
+            write_array(message, 7, false);
         }
 
         void PHCController::setup_known_modules()
